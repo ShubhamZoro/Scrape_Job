@@ -9,7 +9,7 @@ Scrape job from naukri and foundit and rank them based on your resume.
 ## API Endpoints
 
 ### Scrape
-- `POST /api/auth/register` - Scrape jobs
+- `POST /scrape` - Scrape jobs
 
 
 ---
