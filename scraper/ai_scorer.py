@@ -26,7 +26,7 @@ class AIScorer:
         scored_jobs = []
         
         for idx, job in enumerate(jobs, 1):
-            print(f"  Analyzing {idx}/{len(jobs)}: {job['Job Title'][:40]}...", end='')
+            # print(f"  Analyzing {idx}/{len(jobs)}: {job['Job Title'][:40]}...", end='')
             
             result = self._calculate_match_score(
                 job['Job Title'],
@@ -41,7 +41,7 @@ class AIScorer:
             job['Match Reason'] = result['brief_reason']
             
             scored_jobs.append(job)
-            print(f" ✓ {result['match_percentage']}%")
+            # print(f" ✓ {result['match_percentage']}%")
             
             # Rate limiting delay
             time.sleep(0.5)
@@ -49,7 +49,7 @@ class AIScorer:
         # Sort by match percentage (highest first)
         scored_jobs.sort(key=lambda x: x['Match %'], reverse=True)
         
-        print(f"\n✅ AI scoring complete! Jobs ranked by match percentage.")
+        # print(f"\n✅ AI scoring complete! Jobs ranked by match percentage.")
         
         return scored_jobs
     

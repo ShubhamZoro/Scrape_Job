@@ -4,7 +4,8 @@ from typing import List, Optional, Dict
 import pandas as pd
 from datetime import datetime
 import os
-
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 from .scrapers.naukri_scraper import NaukriScraper
 from .scrapers.foundit_scraper import FounditScraper
 from .ai_scorer import AIScorer
@@ -50,8 +51,8 @@ class JobScraper:
         chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
         chrome_options.add_experimental_option('useAutomationExtension', False)
         
-        self.driver = webdriver.Chrome(options=chrome_options)
-        print("✅ Chrome driver initialized")
+        self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()),options=chrome_options)
+        #print("✅ Chrome driver initialized")
         
     def load_resume(self):
         """Load resume content if provided"""
@@ -62,50 +63,50 @@ class JobScraper:
             
     def scrape_all_sources(self):
         """Scrape jobs from all sources"""
-        print(f"\n{'=' * 70}")
-        print(f"SCRAPING JOBS")
-        print(f"{'=' * 70}")
-        print(f"📋 Job Profiles: {', '.join(self.job_profiles)}")
-        print(f"📍 Location: {self.location}")
-        print(f"💼 Experience: {self.experience or 'Not specified'}")
-        print(f"🔢 Jobs per profile: {self.num_jobs}")
+        # print(f"\n{'=' * 70}")
+        # print(f"SCRAPING JOBS")
+        # print(f"{'=' * 70}")
+        # print(f"📋 Job Profiles: {', '.join(self.job_profiles)}")
+        # print(f"📍 Location: {self.location}")
+        # print(f"💼 Experience: {self.experience or 'Not specified'}")
+        # print(f"🔢 Jobs per profile: {self.num_jobs}")
         
         for job_profile in self.job_profiles:
-            print(f"\n{'─' * 70}")
-            print(f"Scraping: {job_profile}")
-            print(f"{'─' * 70}")
+            # print(f"\n{'─' * 70}")
+            # print(f"Scraping: {job_profile}")
+            # print(f"{'─' * 70}")
             
-            # Scrape Naukri
-            print("\n📍 Scraping NAUKRI...")
+            # # Scrape Naukri
+            # print("\n📍 Scraping NAUKRI...")
             naukri_scraper = NaukriScraper(self.driver)
             naukri_jobs = naukri_scraper.scrape(
                 job_profile, self.location, self.experience, self.num_jobs
             )
             self.all_jobs.extend(naukri_jobs)
-            print(f"   Found {len(naukri_jobs)} jobs from Naukri")
+            # print(f"   Found {len(naukri_jobs)} jobs from Naukri")
             
-            # Scrape Foundit
-            print("\n📍 Scraping FOUNDIT...")
+            # # Scrape Foundit
+            # print("\n📍 Scraping FOUNDIT...")
             foundit_scraper = FounditScraper(self.driver)
             foundit_jobs = foundit_scraper.scrape(
                 job_profile, self.location, self.experience, self.num_jobs
             )
             self.all_jobs.extend(foundit_jobs)
-            print(f"   Found {len(foundit_jobs)} jobs from Foundit")
+        #     print(f"   Found {len(foundit_jobs)} jobs from Foundit")
         
-        print(f"\n✅ Total jobs scraped: {len(self.all_jobs)}")
+        # print(f"\n✅ Total jobs scraped: {len(self.all_jobs)}")
         
     def score_and_rank_jobs(self):
         """Score jobs using AI and rank them"""
         if not self.all_jobs:
-            print("⚠️ No jobs to score")
+            # print("⚠️ No jobs to score")
             return
         
         if self.resume_content and self.openai_api_key:
             ai_scorer = AIScorer(self.openai_api_key)
             self.all_jobs = ai_scorer.score_jobs(self.all_jobs, self.resume_content)
         else:
-            print("\n⚠️ Skipping AI scoring (no resume or API key provided)")
+            # print("\n⚠️ Skipping AI scoring (no resume or API key provided)")
             # Add default scoring fields
             for job in self.all_jobs:
                 job['Match %'] = 0
@@ -116,7 +117,7 @@ class JobScraper:
     def save_results(self) -> str:
         """Save results to Excel file"""
         if not self.all_jobs:
-            print("⚠️ No jobs to save")
+            # print("⚠️ No jobs to save")
             return None
         
         df = pd.DataFrame(self.all_jobs)
@@ -137,11 +138,11 @@ class JobScraper:
         
         print(f"\n✅ Results saved to '{filename}'")
         
-        # Show top matches
-        if self.resume_content and self.openai_api_key:
-            print(f"\n🏆 Top 5 Matches:")
-            for i, job in enumerate(self.all_jobs[:5], 1):
-                print(f"  {i}. {job['Match %']}% - {job['Job Title'][:60]}")
+        # # Show top matches
+        # if self.resume_content and self.openai_api_key:
+        #     # print(f"\n🏆 Top 5 Matches:")
+        #     for i, job in enumerate(self.all_jobs[:5], 1):
+        #         print(f"  {i}. {job['Match %']}% - {job['Job Title'][:60]}")
         
         return filename
     
@@ -160,7 +161,7 @@ class JobScraper:
         finally:
             if self.driver:
                 self.driver.quit()
-                print("\n🔒 Browser closed")
+                # print("\n🔒 Browser closed")
     
     def get_total_jobs(self) -> int:
         """Get total number of jobs scraped"""
