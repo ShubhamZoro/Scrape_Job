@@ -6,8 +6,10 @@ import requests
 import time
 import json
 from pathlib import Path
+import time
 
-BASE_URL = "http://localhost:8000"
+start = time.perf_counter()
+BASE_URL = "http://127.0.0.1:8000"
 
 # Prepare data
 data = {
@@ -57,35 +59,38 @@ print("\n📥 Fetching results as JSON...")
 results_response = requests.get(f'{BASE_URL}/results/{task_id}')
 results = results_response.json()
 print(results)
-print(f"\n{'='*70}")
-print(f"SCRAPED JOBS - JSON FORMAT")
-print(f"{'='*70}")
-print(f"Total Jobs: {results['total_jobs']}")
-print(f"Profiles: {', '.join(results['profiles'])}")
+end = time.perf_counter()
+print(f"Time taken: {end - start:.3f} seconds")
 
-# Display top 5 jobs
-print(f"\n🏆 Top 5 Matches:")
-for i, job in enumerate(results['jobs'][:5], 1):
-    print(f"\n{i}. {job['Job Title']}")
-    print(f"   Match: {job['Match %']}%")
-    print(f"   Source: {job['Source']}")
-    print(f"   Skills: {job['Skills'][:80]}...")
-    print(f"   Link: {job['Job Link'][:60]}...")
+# print(f"\n{'='*70}")
+# print(f"SCRAPED JOBS - JSON FORMAT")
+# print(f"{'='*70}")
+# print(f"Total Jobs: {results['total_jobs']}")
+# print(f"Profiles: {', '.join(results['profiles'])}")
 
-# Save to JSON file (optional)
-output_filename = f"jobs_{task_id}.json"
-with open(output_filename, 'w', encoding='utf-8') as f:
-    json.dump(results, f, indent=2, ensure_ascii=False)
-print(f"\n💾 Saved to: {output_filename}")
+# # Display top 5 jobs
+# print(f"\n🏆 Top 5 Matches:")
+# for i, job in enumerate(results['jobs'][:5], 1):
+#     print(f"\n{i}. {job['Job Title']}")
+#     print(f"   Match: {job['Match %']}%")
+#     print(f"   Source: {job['Source']}")
+#     print(f"   Skills: {job['Skills'][:80]}...")
+#     print(f"   Link: {job['Job Link'][:60]}...")
 
-# You can also still download the Excel file if needed
-print(f"\n📄 Excel file available at:")
-print(f"   {BASE_URL}/download/{status['output_file']}")
+# # Save to JSON file (optional)
+# output_filename = f"jobs_{task_id}.json"
+# with open(output_filename, 'w', encoding='utf-8') as f:
+#     json.dump(results, f, indent=2, ensure_ascii=False)
+# print(f"\n💾 Saved to: {output_filename}")
 
-# Example: Download Excel file too
-download_response = requests.get(f"{BASE_URL}/download/{status['output_file']}")
-with open(status['output_file'], 'wb') as f:
-    f.write(download_response.content)
-print(f"   Downloaded: {status['output_file']}")
+# # You can also still download the Excel file if needed
+# print(f"\n📄 Excel file available at:")
+# print(f"   {BASE_URL}/download/{status['output_file']}")
 
-print("\n✅ Done!")
+# # Example: Download Excel file too
+# download_response = requests.get(f"{BASE_URL}/download/{status['output_file']}")
+# with open(status['output_file'], 'wb') as f:
+#     f.write(download_response.content)
+# print(f"   Downloaded: {status['output_file']}")
+
+# print("\n✅ Done!")

@@ -32,17 +32,20 @@ class FounditScraper:
             List of job dictionaries
         """
         jobs_data = []
+        profile=job_profile.split(' ')
+        job='+'.join(profile)
+        search_job='-'.join(profile)
         
         try:
             # Build URL
             url = (
-                f"https://www.foundit.in/search/{job_profile}-jobs-in-india?"
-                f"start=1&limit={num_jobs}&query={job_profile}&location={location}"
+                f"https://www.foundit.in/search/{search_job}-jobs-in-india?"
+                f"start=1&limit={num_jobs}&query={job}&location={location}"
                 f"&queryDerived=true&jobCities={location}"
             )
             
-            if experience and str(experience).strip():
-                url += f"&experienceRanges={experience}%7E{experience}"
+            exp_min, exp_max = experience.split('-')
+            url += f"&experienceRanges={exp_min}~{exp_max}"
             
             url += f"&jobFreshness={freshness}"
             
