@@ -4,6 +4,8 @@
 # Virtual environments
 venva/
 .venva/
+.venv/
+venv/
 env/
 ENV/
 
@@ -11,3 +13,4 @@ ENV/
 __pycache__/
 *.pyc
 .vercel
+fastapi_keys.pem
