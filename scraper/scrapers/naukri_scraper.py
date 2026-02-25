@@ -1,14 +1,11 @@
-from selenium.webdriver.common.by import By
+
+from scrapling.defaults import PlayWrightFetcher
 from typing import List, Dict, Optional
-import time
 
 
 class NaukriScraper:
-    """Scraper for Naukri.com"""
-    
-    def __init__(self, driver):
-        self.driver = driver
-        
+    """Scraper for Naukri.com using Scrapling PlayWrightFetcher"""
+
     def scrape(
         self,
         job_profile: str,
@@ -16,51 +13,39 @@ class NaukriScraper:
         experience: Optional[str],
         num_jobs: int
     ) -> List[Dict]:
-        """
-        Scrape jobs from Naukri.com
-        
-        Args:
-            job_profile: Job title to search for
-            location: Location for job search
-            experience: Experience level
-            num_jobs: Number of jobs to scrape
-            
-        Returns:
-            List of job dictionaries
-        """
         jobs_data = []
-        
+
         try:
-            # Build URL
             query = job_profile.lower().replace(' ', '-').replace('/', '-')
             loc_param = f"-in-{location.lower().replace(' ', '-')}" if location else ""
-            
+
             exp_param = ""
             if experience and str(experience).strip():
-                if '-' in str(experience):
-                    exp_range = str(experience).replace(' ', '')
-                    exp_param = f"&experience={exp_range}"
-                else:
-                    exp_param = f"&experience={experience}"
-            
+                exp_range = str(experience).replace(' ', '')
+                exp_param = f"&experience={exp_range}"
+
             url = f"https://www.naukri.com/{query}-jobs{loc_param}?jobAge=1{exp_param}"
-            
             print(f"  🔍 URL: {url}")
-            
-            # Load page
-            self.driver.get(url)
-            time.sleep(5)
-            
-            # Scroll to load more jobs
-            self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight/2);")
-            time.sleep(2)
-            
-            # Find job cards
-            job_wrappers = self.driver.find_elements(By.CLASS_NAME, "srp-jobtuple-wrapper")[:num_jobs]
-            
+
+            page = PlayWrightFetcher.fetch(
+                url,
+                headless=True,
+                network_idle=True,
+                disable_resources=False,  # Must be False — Naukri needs JS to render cards
+                timeout=60000,            # 60s — Naukri is slow
+            )
+
+            # Try multiple selectors — Naukri changes class names periodically
+            job_wrappers = (
+                list(page.css('.srp-jobtuple-wrapper')) or
+                list(page.css('article.jobTuple')) or
+                list(page.css('.job-tuple-wrapper')) or
+                list(page.css('[class*="jobTuple"]')) or
+                list(page.css('[data-job-id]'))
+            )
+            job_wrappers = job_wrappers[:num_jobs]
             print(f"  Found {len(job_wrappers)} job listings")
-            
-            # Extract job details
+
             for i, wrapper in enumerate(job_wrappers, 1):
                 try:
                     job_data = self._extract_job_details(wrapper)
@@ -69,42 +54,56 @@ class NaukriScraper:
                         print(f"    ✓ Job {i}: {job_data['Job Title'][:50]}")
                 except Exception as e:
                     print(f"    ✗ Error extracting job {i}: {e}")
-        
+
         except Exception as e:
             print(f"  ❌ Error scraping Naukri: {e}")
-        
+
         return jobs_data
-    
+
     def _extract_job_details(self, wrapper) -> Optional[Dict]:
-        """Extract details from a job card wrapper"""
+        """Extract job title, link, and skills from a job card"""
         try:
-            # Get job title and link
-            row1_div = wrapper.find_element(By.CLASS_NAME, "row1")
-            job_link_elem = row1_div.find_element(By.TAG_NAME, "a")
-            title = job_link_elem.text.strip()
-            link = job_link_elem.get_attribute("href")
-            
-            # Get skills
+            # Try multiple known title/link selectors
+            link_elem = (
+                wrapper.css_first('.row1 a') or
+                wrapper.css_first('a.title') or
+                wrapper.css_first('a.jobTitle') or
+                wrapper.css_first('[class*="title"] a') or
+                wrapper.css_first('h2 a') or
+                wrapper.css_first('a[href*="naukri.com"]')
+            )
+
+            if not link_elem:
+                return None
+
+            title = link_elem.text.strip()
+            link = link_elem.attrib.get('href', '')
+
+            if not title or not link:
+                return None
+
+            # Try multiple known skill selectors
             skills = "N/A"
-            try:
-                row5_div = wrapper.find_element(By.CLASS_NAME, "row5")
-                skill_items = row5_div.find_elements(By.TAG_NAME, "li")
-                if skill_items:
-                    skills = ", ".join([
-                        item.text.strip() 
-                        for item in skill_items 
-                        if item.text.strip()
-                    ])
-            except:
-                pass
-            
+            skill_container = (
+                wrapper.css_first('.row5') or
+                wrapper.css_first('.tags-gt') or
+                wrapper.css_first('[class*="skill"]') or
+                wrapper.css_first('ul.tags')
+            )
+            if skill_container:
+                items = skill_container.css('li') or skill_container.css('a')
+                if items:
+                    extracted = [s.text.strip() for s in items if s.text.strip()]
+                    if extracted:
+                        skills = ", ".join(extracted)
+
             return {
                 'Source': 'Naukri',
                 'Job Title': title,
                 'Skills': skills,
                 'Job Link': link,
             }
-            
+
         except Exception as e:
             print(f"      Error extracting job details: {e}")
             return None

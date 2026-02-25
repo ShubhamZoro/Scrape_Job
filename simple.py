@@ -9,7 +9,7 @@ from pathlib import Path
 import time
 
 start = time.perf_counter()
-BASE_URL = "http://127.0.0.1:8000"
+BASE_URL = "http://localhost:8000/"
 
 # Prepare data
 data = {
@@ -20,7 +20,7 @@ data = {
 }
 
 # Optional: Add resume
-resume_path = Path(r'C:\Users\Shubh\Desktop\Scrape\ModularScrape\Resume.pdf')
+resume_path = Path(r'Resume.pdf')
 files = None
 if resume_path.exists():
     files = {'resume_file': open(resume_path, 'rb')}
