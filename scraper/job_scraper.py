@@ -1,6 +1,6 @@
-
 from typing import List, Optional
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from .scrapers.naukri_scraper import NaukriScraper
 from .scrapers.foundit_scraper import FounditScraper
 from .ai_scorer import AIScorer
@@ -29,51 +29,65 @@ class JobScraper:
         self.all_jobs: List[dict] = []
         self.resume_content: Optional[str] = None
 
-    # ── Private ───────────────────────────────────────────────────────────────
-
     def _load_resume(self):
-        """Load resume text content if a path was provided"""
         if self.resume_path:
             self.resume_content = read_resume(self.resume_path)
             print("✅ Resume loaded")
         else:
             print("ℹ️  No resume provided — AI scoring will be skipped")
 
+    def _scrape_single(self, source: str, job_profile: str) -> List[dict]:
+        """Scrape one source for one profile — runs in a thread"""
+        if source == "naukri":
+            return NaukriScraper().scrape(
+                job_profile, self.location, self.experience, self.num_jobs
+            )
+        elif source == "foundit":
+            return FounditScraper().scrape(
+                job_profile, self.location, self.experience, self.num_jobs
+            )
+        return []
+
     def _scrape_all_sources(self):
-        """Scrape jobs from Naukri and Foundit for every job profile"""
-        for job_profile in self.job_profiles:
-            print(f"\n{'─' * 60}")
-            print(f"  Scraping: {job_profile}")
-            print(f"{'─' * 60}")
+        """
+        Scrape all profiles x sources in parallel.
+        e.g. 2 profiles x 2 sources = 4 threads running simultaneously.
+        """
+        tasks = [
+            (source, profile)
+            for profile in self.job_profiles
+            for source in ["naukri", "foundit"]
+        ]
 
-            # Naukri
-            print("\n📍 Scraping NAUKRI...")
-            naukri_jobs = NaukriScraper().scrape(
-                job_profile, self.location, self.experience, self.num_jobs
-            )
-            self.all_jobs.extend(naukri_jobs)
-            print(f"   ✅ {len(naukri_jobs)} jobs from Naukri")
+        print(f"\n🚀 Scraping {len(tasks)} tasks in parallel...")
 
-            # Foundit
-            print("\n📍 Scraping FOUNDIT...")
-            foundit_jobs = FounditScraper().scrape(
-                job_profile, self.location, self.experience, self.num_jobs
-            )
-            self.all_jobs.extend(foundit_jobs)
-            print(f"   ✅ {len(foundit_jobs)} jobs from Foundit")
+        with ThreadPoolExecutor(max_workers=len(tasks)) as executor:
+            future_to_task = {
+                executor.submit(self._scrape_single, source, profile): (source, profile)
+                for source, profile in tasks
+            }
+
+            for future in as_completed(future_to_task):
+                source, profile = future_to_task[future]
+                try:
+                    jobs = future.result()
+                    self.all_jobs.extend(jobs)
+                    print(f"  ✅ {source.capitalize()} / {profile}: {len(jobs)} jobs")
+                except Exception as e:
+                    print(f"  ❌ {source.capitalize()} / {profile}: {e}")
 
         print(f"\n🔢 Total jobs scraped: {len(self.all_jobs)}")
 
     def _score_and_rank(self):
-        """Score jobs using AI if resume and API key are available"""
         if not self.all_jobs:
             print("⚠️  No jobs to score")
             return
 
         if self.resume_content and self.openai_api_key:
             print("\n🤖 Running AI scoring...")
-            ai_scorer = AIScorer(self.openai_api_key)
-            self.all_jobs = ai_scorer.score_jobs(self.all_jobs, self.resume_content)
+            self.all_jobs = AIScorer(self.openai_api_key).score_jobs(
+                self.all_jobs, self.resume_content
+            )
             print("✅ AI scoring complete")
         else:
             print("\n⚠️  Skipping AI scoring (no resume or API key)")
@@ -83,13 +97,8 @@ class JobScraper:
                 job["Missing Skills"] = "N/A"
                 job["Match Reason"] = "No AI scoring available"
 
-    # ── Public ────────────────────────────────────────────────────────────────
-
     def scrape_and_rank(self) -> List[dict]:
-        """
-        Main entry point — scrape, score, and return jobs as a list.
-        No files are written to disk.
-        """
+        """Main entry point — returns all jobs as a list, nothing written to disk."""
         self._load_resume()
         self._scrape_all_sources()
         self._score_and_rank()

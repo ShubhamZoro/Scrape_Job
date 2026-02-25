@@ -1,6 +1,6 @@
-
 from scrapling.defaults import PlayWrightFetcher
 from typing import List, Dict, Optional
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 class FounditScraper:
@@ -25,7 +25,6 @@ class FounditScraper:
             if experience and '-' in str(experience):
                 exp_min, exp_max = experience.split('-')
 
-            # Exact same URL structure as the working Selenium version
             url = (
                 f"https://www.foundit.in/search/{search_job}-jobs?"
                 f"start=1&limit={num_jobs}&query={job}&location={location}"
@@ -34,13 +33,14 @@ class FounditScraper:
             )
             print(f"  🔍 URL: {url}")
 
+            # Step 1: Fetch listing page
             page = PlayWrightFetcher.fetch(
                 url,
                 headless=True,
                 network_idle=False,
                 disable_resources=False,
                 timeout=60000,
-                wait_selector=".jobCardWrapper",  # Wait until cards are in DOM — replaces time.sleep(5)
+                wait_selector=".jobCardWrapper",
             )
 
             job_wrappers = list(page.css('.jobCardWrapper'))[:num_jobs]
@@ -48,14 +48,8 @@ class FounditScraper:
 
             job_links = self._extract_job_links(job_wrappers)
 
-            for idx, job_info in enumerate(job_links, 1):
-                try:
-                    job_data = self._extract_job_details(job_info)
-                    if job_data:
-                        jobs_data.append(job_data)
-                        print(f"    ✓ Job {idx}: {job_data['Job Title'][:50]}")
-                except Exception as e:
-                    print(f"    ✗ Error extracting job {idx}: {e}")
+            # Step 2: Fetch all detail pages IN PARALLEL
+            jobs_data = self._fetch_details_parallel(job_links)
 
         except Exception as e:
             print(f"  ❌ Error scraping Foundit: {e}")
@@ -63,11 +57,9 @@ class FounditScraper:
         return jobs_data
 
     def _extract_job_links(self, job_wrappers) -> List[Dict]:
-        """Extract job titles and links from listing cards"""
         job_links = []
         for wrapper in job_wrappers:
             try:
-                # Same structure as Selenium: jobCardTitle > a
                 title_elem = wrapper.css_first('.jobCardTitle a')
                 if title_elem:
                     title = title_elem.text.strip()
@@ -78,8 +70,29 @@ class FounditScraper:
                 continue
         return job_links
 
+    def _fetch_details_parallel(self, job_links: List[Dict]) -> List[Dict]:
+        """Fetch all job detail pages concurrently instead of one by one"""
+        results = []
+
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            future_to_job = {
+                executor.submit(self._extract_job_details, job_info): job_info
+                for job_info in job_links
+            }
+
+            for idx, future in enumerate(as_completed(future_to_job), 1):
+                job_info = future_to_job[future]
+                try:
+                    job_data = future.result()
+                    if job_data:
+                        results.append(job_data)
+                        print(f"    ✓ Job {idx}: {job_data['Job Title'][:50]}")
+                except Exception as e:
+                    print(f"    ✗ Error fetching {job_info['title'][:40]}: {e}")
+
+        return results
+
     def _extract_job_details(self, job_info: Dict) -> Optional[Dict]:
-        """Visit individual job page and extract skills"""
         try:
             page = PlayWrightFetcher.fetch(
                 job_info['link'],
@@ -87,11 +100,10 @@ class FounditScraper:
                 network_idle=False,
                 disable_resources=False,
                 timeout=60000,
-                wait_selector="#skillSectionNew",  # Wait for skills section — replaces time.sleep(3)
+                wait_selector="#skillSectionNew",
             )
 
             skills = []
-            # Same as Selenium: find by ID skillSectionNew, then all <a> tags
             skill_section = page.css_first('#skillSectionNew')
             if skill_section:
                 skill_tags = skill_section.css('a')
